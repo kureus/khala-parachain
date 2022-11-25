@@ -11835,6 +11835,7 @@ dependencies = [
  "pallet-democracy",
  "pallet-elections-phragmen",
  "pallet-identity",
+ "pallet-index",
  "pallet-lottery",
  "pallet-membership",
  "pallet-mq-runtime-api",

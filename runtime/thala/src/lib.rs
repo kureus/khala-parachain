@@ -65,7 +65,9 @@ use static_assertions::const_assert;
 
 // A few exports that help ease life for downstream crates.
 pub use frame_support::{
-    construct_runtime, match_types, parameter_types,
+    construct_runtime,
+    dispatch::DispatchClass,
+    match_types, parameter_types,
     traits::{
         tokens::nonfungibles::*, AsEnsureOriginWithArg, ConstU32, Contains, Currency,
         EitherOfDiverse, EqualPrivilegeOnly, Everything, Imbalance, InstanceFilter, IsInVec,
@@ -75,7 +77,6 @@ pub use frame_support::{
         constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
         ConstantMultiplier, IdentityFee, Weight,
     },
-    dispatch::DispatchClass,
     BoundedVec, PalletId, RuntimeDebug, StorageValue,
 };
 
@@ -104,7 +105,7 @@ pub use parachains_common::{rmrk_core, rmrk_equip, uniques, Index, *};
 
 pub use pallet_phala_world::{pallet_pw_incubation, pallet_pw_nft_sale};
 pub use phala_pallets::{
-    pallet_fat, pallet_mining, pallet_mq, pallet_registry, pallet_stakepool, pallet_fat_tokenomic
+    pallet_fat, pallet_fat_tokenomic, pallet_mining, pallet_mq, pallet_registry, pallet_stakepool,
 };
 pub use subbridge_pallets::{
     chainbridge, dynamic_trader::DynamicWeightTrader, fungible_adapter::XTransferAdapter, helper,
@@ -187,7 +188,8 @@ pub type SignedExtra = (
     pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
 );
 /// Unchecked extrinsic type as expected by this runtime.
-pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
+pub type UncheckedExtrinsic =
+    generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
 /// Extrinsic type that has already been checked.
 pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, RuntimeCall, SignedExtra>;
 /// Executive: handles dispatch to the various modules.
@@ -284,6 +286,9 @@ construct_runtime! {
         RmrkMarket: pallet_rmrk_market::{Pallet, Call, Storage, Event<T>} = 104,
         PWNftSale: pallet_pw_nft_sale::{Pallet, Call, Storage, Event<T>} = 105,
         PWIncubation: pallet_pw_incubation::{Pallet, Call, Storage, Event<T>} = 106,
+
+        // inDEX
+        PalletIndex: pallet_index::{Pallet, Call, Storage, Event<T>} = 111,
     }
 }
 
@@ -370,7 +375,9 @@ impl Contains<RuntimeCall> for BaseCallFilter {
             RuntimeCall::PhalaMining { .. } | RuntimeCall::PhalaStakePool { .. } |
             RuntimeCall::PhalaFatContracts { .. } | RuntimeCall::PhalaFatTokenomic { .. } |
             // Phala World
-            RuntimeCall::PWNftSale { .. } | RuntimeCall::PWIncubation { .. }
+            RuntimeCall::PWNftSale { .. } | RuntimeCall::PWIncubation { .. } |
+            // inDEX
+            RuntimeCall::PalletIndex { .. }
         )
     }
 }
@@ -559,7 +566,9 @@ impl InstanceFilter<RuntimeCall> for ProxyType {
             ),
             ProxyType::Collator => matches!(
                 c,
-                RuntimeCall::CollatorSelection { .. } | RuntimeCall::Utility { .. } | RuntimeCall::Multisig { .. }
+                RuntimeCall::CollatorSelection { .. }
+                    | RuntimeCall::Utility { .. }
+                    | RuntimeCall::Multisig { .. }
             ),
             ProxyType::StakePoolManager => matches!(
                 c,
@@ -569,7 +578,9 @@ impl InstanceFilter<RuntimeCall> for ProxyType {
                     | RuntimeCall::PhalaStakePool(pallet_stakepool::Call::start_mining { .. })
                     | RuntimeCall::PhalaStakePool(pallet_stakepool::Call::stop_mining { .. })
                     | RuntimeCall::PhalaStakePool(pallet_stakepool::Call::restart_mining { .. })
-                    | RuntimeCall::PhalaStakePool(pallet_stakepool::Call::reclaim_pool_worker { .. })
+                    | RuntimeCall::PhalaStakePool(
+                        pallet_stakepool::Call::reclaim_pool_worker { .. }
+                    )
                     | RuntimeCall::PhalaStakePool(pallet_stakepool::Call::create { .. })
                     | RuntimeCall::PhalaRegistry(pallet_registry::Call::register_worker { .. })
                     | RuntimeCall::PhalaMq(pallet_mq::Call::sync_offchain_message { .. })
@@ -1547,13 +1558,17 @@ impl pallet_stakepool::Config for Runtime {
 }
 impl pallet_fat::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
-    type InkCodeSizeLimit = ConstU32<{1024*1024*2}>;
-    type SidevmCodeSizeLimit = ConstU32<{1024*1024*8}>;
+    type InkCodeSizeLimit = ConstU32<{ 1024 * 1024 * 2 }>;
+    type SidevmCodeSizeLimit = ConstU32<{ 1024 * 1024 * 8 }>;
 }
 
 impl pallet_fat_tokenomic::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
+}
+impl pallet_index::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type CommitteeOrigin = EnsureRoot<Self::AccountId>;
 }
 
 #[cfg(feature = "runtime-benchmarks")]
